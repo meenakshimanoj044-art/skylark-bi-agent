@@ -21,46 +21,69 @@ def fetch_monday_board(board_id, api_token):
         return pd.DataFrame()
     
     url = "https://monday.com"
-    headers = {"Authorization": api_token, "API-Version": "2024-04"}
+    headers = {
+        "Authorization": api_token, 
+        "API-Version": "2024-04",
+        "Content-Type": "application/json"
+    }
     
     # Secure GraphQL extraction utilizing fast page limit
-    query = f"""
-    query {{
-      boards (ids: [{board_id}]) {{
-        items_page (limit: 150) {{
-          items {{
+    query = """
+    query ($board_ids: [ID!]) {
+      boards (ids: $board_ids) {
+        items_page (limit: 150) {
+          items {
             name
-            column_values {{
+            column_values {
               id
               text
-            }}
-          }}
-        }}
-      }}
-    }}
+            }
+          }
+        }
+      }
+    }
     """
+    variables = {"board_ids": [int(board_id)]}
+    
     try:
-        response = requests.post(url, json={'query': query}, headers=headers, timeout=12)
+        response = requests.post(url, json={'query': query, 'variables': variables}, headers=headers, timeout=15)
+        
+        if response.status_code != 200:
+            st.sidebar.error(f"HTTP Error {response.status_code} on board {board_id}")
+            return pd.DataFrame()
+            
         res_json = response.json()
         
         if 'errors' in res_json:
-            st.sidebar.error(f"API Error: {res_json['errors'][0]['message']}")
+            st.sidebar.error(f"GraphQL Error: {res_json['errors'][0]['message']}")
             return pd.DataFrame()
             
-        # Robust parsing layout variant handler
-        boards_data = res_json.get('data', {}).get('boards', [])
-        if not boards_data:
-            return pd.DataFrame()
-            
-        items = boards_data[0].get('items_page', {}).get('items', [])
+        # Exception-Proof Dictionary Navigation Fallback
+        data_payload = res_json.get('data', {})
+        boards_list = data_payload.get('boards', [])
         
+        if not boards_list:
+            st.sidebar.warning(f"No board entries found for target ID {board_id}.")
+            return pd.DataFrame()
+            
+        target_board = boards_list[0]
+        items_page = target_board.get('items_page', {})
+        items = items_page.get('items', [])
+        
+        if not items:
+            # Check old API structural layout format compatibility
+            items = target_board.get('items', [])
+            
         # Flattening structurally nested JSON into raw row records
         rows = []
         for item in items:
-            row = {'Item Name': item['name']}
-            for val in item['column_values']:
-                row[val['id']] = val['text']
+            row = {'Item Name': item.get('name', 'Unnamed Item')}
+            column_vals = item.get('column_values', [])
+            for val in column_vals:
+                if 'id' in val:
+                    row[val['id']] = val.get('text', '')
             rows.append(row)
+            
         return pd.DataFrame(rows)
     except Exception as e:
         st.sidebar.error(f"Extraction error on board {board_id}: {str(e)}")
@@ -75,7 +98,7 @@ if MONDAY_TOKEN and BOARD_DEALS and BOARD_ORDERS and OPENAI_KEY:
             st.session_state.df_deals = fetch_monday_board(BOARD_DEALS, MONDAY_TOKEN)
             st.session_state.df_orders = fetch_monday_board(BOARD_ORDERS, MONDAY_TOKEN)
             
-    if not st.session_state.df_deals.empty and not st.session_state.df_orders.empty:
+    if 'df_deals' in st.session_state and not st.session_state.df_deals.empty and 'df_orders' in st.session_state and not st.session_state.df_orders.empty:
         st.sidebar.success("Boards synchronized successfully!")
 
         # MANDATORY ASSIGNMENT FEATURE: Leadership Updates Toggle Switch
@@ -157,6 +180,6 @@ if MONDAY_TOKEN and BOARD_DEALS and BOARD_ORDERS and OPENAI_KEY:
                     except Exception as e:
                         st.error(f"Processing Pipeline Execution Failure: {str(e)}")
     else:
-        st.sidebar.error("Could not load data. Please verify your Board IDs and Token permissions.")
+        st.sidebar.warning("Awaiting proper validation response values. Confirm active data availability on Monday boards.")
 else:
     st.info("📋 Active Setup Needed: Please enter valid Monday.com credentials and your OpenRouter API key in the sidebar to wake up the agent.")

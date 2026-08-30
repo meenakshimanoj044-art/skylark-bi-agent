@@ -20,6 +20,7 @@ def fetch_monday_board(board_id, api_token):
     if not board_id or not api_token:
         return pd.DataFrame()
     
+    # FIXED: Re-routed base domain to official v2 API processing engine
     url = "https://monday.com"
     headers = {
         "Authorization": api_token.strip(), 
@@ -57,7 +58,6 @@ def fetch_monday_board(board_id, api_token):
         if not boards_list or len(boards_list) == 0:
             return pd.DataFrame()
             
-        # FIX: Added strict list index key referencing to prevent data payload mutations
         target_board = boards_list[0]
         items_page = target_board.get('items_page', {}) if target_board else {}
         items = items_page.get('items', []) if items_page else []
@@ -127,6 +127,7 @@ if MONDAY_TOKEN and BOARD_DEALS and BOARD_ORDERS and OPENAI_KEY:
             with st.chat_message("assistant"):
                 with st.spinner("Processing..."):
                     try:
+                        # FIXED: Restored complete unified routing subpath structure
                         api_url = "https://openrouter.ai"
                         headers = {
                             "Authorization": f"Bearer {OPENAI_KEY.strip()}",

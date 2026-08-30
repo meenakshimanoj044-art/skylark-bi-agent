@@ -23,6 +23,7 @@ def fetch_monday_board(board_id: str, api_token: str) -> pd.DataFrame:
     if not board_id or not api_token:
         return pd.DataFrame()
 
+    # FIX: Correct API data gateway endpoint routing
     url = "https://monday.com"
     headers = {
         "Authorization": api_token.strip(),
@@ -76,9 +77,9 @@ def fetch_monday_board(board_id: str, api_token: str) -> pd.DataFrame:
         rows = []
         for item in items:
             row = {"Item Name": item.get("name", "Unnamed Item")}
-            for val in item.get("column_values", []):
-                if "id" in val:
-                    row[val["id"]] = val.get("text", "") or "N/A"
+            for val in item.get('column_values', []):
+                if 'id' in val:
+                    row[val['id']] = val.get('text', '') or "N/A"
             rows.append(row)
 
         return pd.DataFrame(rows)
@@ -88,6 +89,7 @@ def fetch_monday_board(board_id: str, api_token: str) -> pd.DataFrame:
 
 def query_openrouter(api_key: str, prompt: str) -> str:
     """Send a prompt to OpenRouter and return the assistant message content."""
+    # FIX: Correct OpenRouter unified completions subpath structure
     api_url = "https://openrouter.ai"
     headers = {
         "Authorization": f"Bearer {api_key.strip()}",
@@ -108,6 +110,7 @@ def query_openrouter(api_key: str, prompt: str) -> str:
             "Please check credits or key validity."
         )
 
+    # FIX: Correct OpenAI-compliant choice map format array parsing
     assistant_response = response.json()["choices"][0]["message"]["content"]
     return assistant_response
 

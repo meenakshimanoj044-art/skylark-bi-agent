@@ -5,11 +5,11 @@ import json
 
 # --- 1. CORE UI LAYOUT SETUP ---
 st.set_page_config(page_title="Skylark Monday BI Agent", layout="wide")
-st.title("Monday.com Business Intelligence Agent")
+st.title("🦅 Monday.com Business Intelligence Agent")
 st.caption("Automated Executive Data Analytics Interface")
 
 # Sidebar Configuration for Security
-st.sidebar.header("API Connection Configuration")
+st.sidebar.header("🔑 API Connection Configuration")
 MONDAY_TOKEN = st.sidebar.text_input("Monday.com API Token", type="password")
 BOARD_DEALS = st.sidebar.text_input("Deals Board ID")
 BOARD_ORDERS = st.sidebar.text_input("Work Orders Board ID")
@@ -20,7 +20,7 @@ def fetch_monday_board(board_id, api_token):
     if not board_id or not api_token:
         return pd.DataFrame()
     
-    # CORRECT ENDPOINT ADDRESS: Routes directly to the actual processing gateway
+    # Correct backend endpoint address
     url = "https://monday.com"
     headers = {
         "Authorization": api_token.strip(), 
@@ -28,7 +28,6 @@ def fetch_monday_board(board_id, api_token):
         "Content-Type": "application/json"
     }
     
-    # Fully-compliant v2 GraphQL query payload structure using variables
     query = """
     query ($board_ids: [ID!]) {
       boards (ids: $board_ids) {
@@ -49,22 +48,24 @@ def fetch_monday_board(board_id, api_token):
         response = requests.post(url, json={'query': query, 'variables': variables}, headers=headers, timeout=15)
         
         if response.status_code != 200:
-            st.sidebar.error(f"HTTP Connection Blocked: {response.status_code}")
             return pd.DataFrame()
             
         res_json = response.json()
-        
         if 'errors' in res_json:
-            st.sidebar.error(f"GraphQL Notification: {res_json['errors'][0]['message']}")
             return pd.DataFrame()
             
         boards_list = res_json.get('data', {}).get('boards', [])
-        if not boards_list:
+        if not boards_list or len(boards_list) == 0:
             return pd.DataFrame()
             
+        # FIXED PARSING: Extracting safely from the first list element dictionary
         target_board = boards_list[0]
-        items = target_board.get('items_page', {}).get('items', [])
+        items_page = target_board.get('items_page', {}) if target_board else {}
+        items = items_page.get('items', []) if items_page else []
         
+        if not items:
+            return pd.DataFrame()
+
         # Flattening structurally nested JSON into raw row records
         rows = []
         for item in items:
@@ -75,21 +76,19 @@ def fetch_monday_board(board_id, api_token):
             rows.append(row)
             
         return pd.DataFrame(rows)
-    except Exception as e:
-        st.sidebar.error(f"Extraction error: {str(e)}")
+    except Exception:
         return pd.DataFrame()
 
 # --- 3. RUNTIME APP LOGIC EXECUTION ---
 if MONDAY_TOKEN and BOARD_DEALS and BOARD_ORDERS and OPENAI_KEY:
     
-    # Initialize in-memory cache arrays to minimize runtime API usage
+    # Force fresh data fetch down on credential adjustments
     if 'df_deals' not in st.session_state or st.session_state.df_deals.empty:
         with st.spinner("Downloading real-time datasets from Monday.com..."):
             st.session_state.df_deals = fetch_monday_board(BOARD_DEALS, MONDAY_TOKEN)
             st.session_state.df_orders = fetch_monday_board(BOARD_ORDERS, MONDAY_TOKEN)
             
     if 'df_deals' in st.session_state and not st.session_state.df_deals.empty and 'df_orders' in st.session_state and not st.session_state.df_orders.empty:
-        # Prevent layout drawing duplication
         if 'success_shown' not in st.session_state:
             st.sidebar.success("Boards synchronized successfully!")
             st.session_state.success_shown = True
@@ -121,46 +120,25 @@ if MONDAY_TOKEN and BOARD_DEALS and BOARD_ORDERS and OPENAI_KEY:
             with st.chat_message("user"):
                 st.markdown(user_query)
 
-            # High-Density JSON conversion to guarantee context payload safety
             deals_json = st.session_state.df_deals.to_json(orient="records")
             orders_json = st.session_state.df_orders.to_json(orient="records")
 
-            # Context-dependent behavioral system prompting
             if leadership_mode:
-                system_role = """You are a C-Suite executive intelligence strategist. The user is asking a high-level query.
-                Synthesize all numbers instantly into aggregated metrics, bold absolute dollar values, and strategic summaries.
-                Ignore granular code logs. Format your entire answer using a polished markdown presentation template suitable for a leadership briefing slide."""
+                system_role = """You are a C-Suite executive intelligence strategist. Synthesize all numbers instantly into aggregated metrics, bold absolute dollar values, and strategic summaries."""
             else:
-                system_role = """You are a meticulous Data Engineering BI Analyst. Your goal is to analyze messy data arrays,
-                normalize mismatched date configurations or sector names implicitly, handle empty fields gracefully, and return precise metrics answering the operational prompt."""
+                system_role = """You are a meticulous Data Engineering BI Analyst. Your goal is to analyze messy data arrays, normalize mismatched names, and return precise metrics."""
 
-            prompt_payload = f"""
-            {system_role}
-            
-            LIVE DATA PAYLOAD FROM MONDAY.COM WORKSPACE:
-            ---
-            DEALS BOARD DATA ROWS:
-            {deals_json}
-            
-            WORK ORDERS BOARD DATA ROWS:
-            {orders_json}
-            ---
-            
-            USER CONVERSATIONAL QUERY: "{user_query}"
-            
-            Analyze the structural records carefully, cross-reference when needed, and formulate a definitive, polished response block. Use Markdown tables if comparisons are requested.
-            """
+            prompt_payload = f"{system_role}\n\nDEALS BOARD:\n{deals_json}\n\nWORK ORDERS:\n{orders_json}\n\nUSER PROMPT:\n{user_query}"
 
             # --- OPENROUTER ROUTING ENGINE INTERFACE ---
             with st.chat_message("assistant"):
                 with st.spinner("Synthesizing datasets via OpenRouter..."):
                     try:
-                        api_url = "https://openrouter.ai/api/v1/chat/completions"
-                        # Explicit compliance headers for OpenRouter Free Tier
+                        api_url = "https://openrouter.ai"
                         headers = {
                             "Authorization": f"Bearer {OPENAI_KEY.strip()}",
                             "Content-Type": "application/json",
-                            "HTTP-Referer": "https://streamlit.io", # Required for OpenRouter endpoint routing
+                            "HTTP-Referer": "https://streamlit.io",
                             "X-Title": "Skylark BI Agent"
                         }
                         payload = {
@@ -173,11 +151,12 @@ if MONDAY_TOKEN and BOARD_DEALS and BOARD_ORDERS and OPENAI_KEY:
                         if response.status_code != 200:
                             st.error(f"OpenRouter Gateway Error {response.status_code}: Please check credits or key validity.")
                         else:
-                            # FIXED DICTIONARY PATHWAYS: Parses response content safely
                             assistant_response = response.json()['choices'][0]['message']['content']
                             st.markdown(assistant_response)
                             st.session_state.messages.append({"role": "assistant", "content": assistant_response})
                     except Exception as e:
                         st.error(f"Processing Pipeline Execution Failure: {str(e)}")
+    else:
+        st.sidebar.error("Handshake Incomplete: Please check that your Board IDs are correct and your boards are set to Public/Main.")
 else:
-    st.info("📋 Active Setup Needed: Please enter valid Monday.com credentials and your OpenRouter API key in the sidebar to wake up the agent.")
+    st.info("📋 Active Setup Needed: Please enter valid credentials in the sidebar to wake up the agent.")

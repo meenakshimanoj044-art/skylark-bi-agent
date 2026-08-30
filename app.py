@@ -24,8 +24,8 @@ def fetch_monday_board(board_id: str, api_token: str) -> pd.DataFrame:
     if not board_id or not api_token:
         return pd.DataFrame()
 
-    # 👑 FIXED: Routed correctly to the database engine API endpoint gateway instead of home page
-    url = "https://monday.com"
+    # ✅ Correct GraphQL endpoint
+    url = "https://api.monday.com/v2"
     headers = {
         "Authorization": api_token.strip(),
         "API-Version": MONDAY_API_VERSION,
@@ -65,10 +65,9 @@ def fetch_monday_board(board_id: str, api_token: str) -> pd.DataFrame:
             return pd.DataFrame()
 
         boards_list = res_json.get("data", {}).get("boards", [])
-        if not boards_list or len(boards_list) == 0:
+        if not boards_list:
             return pd.DataFrame()
 
-        # 👑 FIXED: Pulls the direct dictionary out of the raw response array list safely
         target_board = boards_list[0]
         items_page = target_board.get("items_page", {}) if target_board else {}
         items = items_page.get("items", []) if items_page else []
@@ -92,8 +91,8 @@ def fetch_monday_board(board_id: str, api_token: str) -> pd.DataFrame:
 # --- 3. OPENROUTER INFERENCE LAYER ---
 def query_openrouter(api_key: str, prompt: str) -> str:
     """Send a prompt to OpenRouter and return the assistant message content."""
-    # 👑 FIXED: Appended missing structural completions subpath suffix to the routing engine url
-    api_url = "https://openrouter.ai"
+    # ✅ Correct completions endpoint
+    api_url = "https://openrouter.ai/api/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {api_key.strip()}",
         "Content-Type": "application/json",
@@ -112,7 +111,6 @@ def query_openrouter(api_key: str, prompt: str) -> str:
             f"OpenRouter Gateway Error {response.status_code}: Please check credits or key validity."
         )
 
-    # 👑 FIXED: Mapped standard chat completions indices cleanly without list layer execution failures
     assistant_response = response.json()["choices"][0]["message"]["content"]
     return assistant_response
 

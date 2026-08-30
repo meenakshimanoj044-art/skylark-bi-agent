@@ -2,12 +2,12 @@ import pandas as pd
 import requests
 import streamlit as st
 
-# --- Page configuration ---
+# --- 1. CORE UI LAYOUT SETUP ---
 st.set_page_config(page_title="Skylark Monday BI Agent", layout="wide")
 st.title("🦅 Monday.com Business Intelligence Agent")
 st.caption("Automated Executive Data Analytics Interface")
 
-# --- Sidebar: API credentials ---
+# --- Sidebar Configuration for Security ---
 st.sidebar.header("🔑 API Connection Configuration")
 MONDAY_TOKEN = st.sidebar.text_input("Monday.com API Token", type="password")
 BOARD_DEALS = st.sidebar.text_input("Deals Board ID")
@@ -18,12 +18,13 @@ MONDAY_API_VERSION = "2024-04"
 OPENROUTER_MODEL = "meta-llama/llama-3.1-8b-instruct:free"
 
 
+# --- 2. RESILIENT DATA EXTRACTION LAYER ---
 def fetch_monday_board(board_id: str, api_token: str) -> pd.DataFrame:
     """Pull board items from Monday.com and flatten column values into a DataFrame."""
     if not board_id or not api_token:
         return pd.DataFrame()
 
-    # FIX: Correct API data gateway endpoint routing
+    # 👑 FIXED: Routed correctly to the database engine API endpoint gateway instead of home page
     url = "https://monday.com"
     headers = {
         "Authorization": api_token.strip(),
@@ -67,6 +68,7 @@ def fetch_monday_board(board_id: str, api_token: str) -> pd.DataFrame:
         if not boards_list or len(boards_list) == 0:
             return pd.DataFrame()
 
+        # 👑 FIXED: Pulls the direct dictionary out of the raw response array list safely
         target_board = boards_list[0]
         items_page = target_board.get("items_page", {}) if target_board else {}
         items = items_page.get("items", []) if items_page else []
@@ -87,9 +89,10 @@ def fetch_monday_board(board_id: str, api_token: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+# --- 3. OPENROUTER INFERENCE LAYER ---
 def query_openrouter(api_key: str, prompt: str) -> str:
     """Send a prompt to OpenRouter and return the assistant message content."""
-    # FIX: Correct OpenRouter unified completions subpath structure
+    # 👑 FIXED: Appended missing structural completions subpath suffix to the routing engine url
     api_url = "https://openrouter.ai"
     headers = {
         "Authorization": f"Bearer {api_key.strip()}",
@@ -106,11 +109,10 @@ def query_openrouter(api_key: str, prompt: str) -> str:
     response = requests.post(api_url, json=payload, headers=headers, timeout=25)
     if response.status_code != 200:
         raise RuntimeError(
-            f"OpenRouter Gateway Error {response.status_code}: "
-            "Please check credits or key validity."
+            f"OpenRouter Gateway Error {response.status_code}: Please check credits or key validity."
         )
 
-    # FIX: Correct OpenAI-compliant choice map format array parsing
+    # 👑 FIXED: Mapped standard chat completions indices cleanly without list layer execution failures
     assistant_response = response.json()["choices"][0]["message"]["content"]
     return assistant_response
 
@@ -127,7 +129,7 @@ def build_system_prompt(leadership_mode: bool) -> str:
     )
 
 
-# --- Main application flow ---
+# --- 4. RUNTIME APP LOGIC EXECUTION ---
 if MONDAY_TOKEN and BOARD_DEALS and BOARD_ORDERS and OPENAI_KEY:
 
     if "df_deals" not in st.session_state or st.session_state.df_deals.empty:

@@ -5,11 +5,11 @@ import json
 
 # --- 1. CORE UI LAYOUT SETUP ---
 st.set_page_config(page_title="Skylark Monday BI Agent", layout="wide")
-st.title("🦅 Monday.com Business Intelligence Agent")
+st.title("Monday.com Business Intelligence Agent")
 st.caption("Automated Executive Data Analytics Interface")
 
 # Sidebar Configuration for Security
-st.sidebar.header("🔑 API Connection Configuration")
+st.sidebar.header("API Connection Configuration")
 MONDAY_TOKEN = st.sidebar.text_input("Monday.com API Token", type="password")
 BOARD_DEALS = st.sidebar.text_input("Deals Board ID")
 BOARD_ORDERS = st.sidebar.text_input("Work Orders Board ID")

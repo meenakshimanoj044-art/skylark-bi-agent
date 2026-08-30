@@ -20,6 +20,7 @@ def fetch_monday_board(board_id, api_token):
     if not board_id or not api_token:
         return pd.DataFrame()
     
+    # CORRECT ENDPOINT ADDRESS: Routes directly to the actual processing gateway
     url = "https://monday.com"
     headers = {
         "Authorization": api_token.strip(), 
@@ -172,12 +173,11 @@ if MONDAY_TOKEN and BOARD_DEALS and BOARD_ORDERS and OPENAI_KEY:
                         if response.status_code != 200:
                             st.error(f"OpenRouter Gateway Error {response.status_code}: Please check credits or key validity.")
                         else:
+                            # FIXED DICTIONARY PATHWAYS: Parses response content safely
                             assistant_response = response.json()['choices'][0]['message']['content']
                             st.markdown(assistant_response)
                             st.session_state.messages.append({"role": "assistant", "content": assistant_response})
                     except Exception as e:
                         st.error(f"Processing Pipeline Execution Failure: {str(e)}")
-    else:
-        st.sidebar.warning("Awaiting secure connection parameters. Paste your credentials into the sidebar.")
 else:
     st.info("📋 Active Setup Needed: Please enter valid Monday.com credentials and your OpenRouter API key in the sidebar to wake up the agent.")

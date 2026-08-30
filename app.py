@@ -20,7 +20,7 @@ def fetch_monday_board(board_id, api_token):
     if not board_id or not api_token:
         return pd.DataFrame()
     
-    url = "https://api.monday.com/v2"
+    url = "https://monday.com"
     headers = {
         "Authorization": api_token.strip(), 
         "API-Version": "2024-04",
@@ -61,7 +61,6 @@ def fetch_monday_board(board_id, api_token):
         if not boards_list:
             return pd.DataFrame()
             
-        # Target first entry element
         target_board = boards_list[0]
         items = target_board.get('items_page', {}).get('items', [])
         
@@ -89,7 +88,10 @@ if MONDAY_TOKEN and BOARD_DEALS and BOARD_ORDERS and OPENAI_KEY:
             st.session_state.df_orders = fetch_monday_board(BOARD_ORDERS, MONDAY_TOKEN)
             
     if 'df_deals' in st.session_state and not st.session_state.df_deals.empty and 'df_orders' in st.session_state and not st.session_state.df_orders.empty:
-        st.sidebar.success("Boards synchronized successfully!")
+        # Prevent layout drawing duplication
+        if 'success_shown' not in st.session_state:
+            st.sidebar.success("Boards synchronized successfully!")
+            st.session_state.success_shown = True
 
         # MANDATORY ASSIGNMENT FEATURE: Leadership Updates Toggle Switch
         leadership_mode = st.checkbox("👔 Activate Executive Briefing Layer (Leadership Updates Mode)")
@@ -152,10 +154,13 @@ if MONDAY_TOKEN and BOARD_DEALS and BOARD_ORDERS and OPENAI_KEY:
             with st.chat_message("assistant"):
                 with st.spinner("Synthesizing datasets via OpenRouter..."):
                     try:
-                        api_url = "https://openrouter.ai"
+                        api_url = "https://openrouter.ai/api/v1/chat/completions"
+                        # Explicit compliance headers for OpenRouter Free Tier
                         headers = {
                             "Authorization": f"Bearer {OPENAI_KEY.strip()}",
-                            "Content-Type": "application/json"
+                            "Content-Type": "application/json",
+                            "HTTP-Referer": "https://streamlit.io", # Required for OpenRouter endpoint routing
+                            "X-Title": "Skylark BI Agent"
                         }
                         payload = {
                             "model": "meta-llama/llama-3.1-8b-instruct:free",
@@ -163,13 +168,16 @@ if MONDAY_TOKEN and BOARD_DEALS and BOARD_ORDERS and OPENAI_KEY:
                             "temperature": 0.15
                         }
                         response = requests.post(api_url, json=payload, headers=headers, timeout=25)
-                        assistant_response = response.json()['choices']['message']['content']
                         
-                        st.markdown(assistant_response)
-                        st.session_state.messages.append({"role": "assistant", "content": assistant_response})
+                        if response.status_code != 200:
+                            st.error(f"OpenRouter Gateway Error {response.status_code}: Please check credits or key validity.")
+                        else:
+                            assistant_response = response.json()['choices'][0]['message']['content']
+                            st.markdown(assistant_response)
+                            st.session_state.messages.append({"role": "assistant", "content": assistant_response})
                     except Exception as e:
                         st.error(f"Processing Pipeline Execution Failure: {str(e)}")
     else:
-        st.sidebar.warning("Awaiting secure connection parameters. Paste your personal API token into the sidebar.")
+        st.sidebar.warning("Awaiting secure connection parameters. Paste your credentials into the sidebar.")
 else:
     st.info("📋 Active Setup Needed: Please enter valid Monday.com credentials and your OpenRouter API key in the sidebar to wake up the agent.")
